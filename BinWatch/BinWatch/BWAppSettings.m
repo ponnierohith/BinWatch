@@ -12,6 +12,15 @@
 #import "BWMailer.h"
 #import "BWSettingsViewController.h"
 #import "BWExportTableViewController.h"
+#import <Parse/Parse.h>
+
+
+@interface BWAppSettings () <UITextFieldDelegate>
+@property (strong, nonatomic) NSString *username;
+@property (strong, nonatomic) NSString *password;
+@property (strong, nonatomic) UIAlertController *alertController;
+@end
+
 
 @implementation BWAppSettings
 
@@ -93,14 +102,70 @@ static NSString* const kDefaultMailID = @"BinWatch.ReapBenefit@gmail.com";
     UIAlertAction* loginButtonAction = [UIAlertAction actionWithTitle:@"Login"
                                                              style:UIAlertActionStyleDefault
                                                            handler:^(UIAlertAction * action){
-                                                               [self saveAppMode:BWBBMPMode];
-                                                               [[AppDelegate appDel] switchToMainStoryBoard];
-
+                                                               [self loginWithUsername:self.username andPassword:self.password];
                                                            }];
     [alert addAction:cancelButtonAction];
     [alert addAction:loginButtonAction];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = @"User name";
+        textField.delegate = self;
+        textField.tag = 0;
+    }];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = @"Password";
+        textField.secureTextEntry = YES;
+        textField.delegate = self;
+        textField.tag = 1;
+    }];
     UIViewController *controllerToShowTo = [[AppDelegate appDel] getTabBarContoller];
     [controllerToShowTo presentViewController:alert animated:YES completion:nil];
+    self.alertController = alert;
+}
+
+-(void)textFieldDidEndEditing:(UITextField *)textField
+{
+    if (textField.tag == 0) {
+        self.username = textField.text;
+    }
+    else if (textField.tag == 1) {
+        self.password = textField.text;
+    }
+    else{
+        self.username = [(UITextField*)self.alertController.textFields[0] text];
+        self.password = [(UITextField*)self.alertController.textFields[0] text];
+    }
+}
+-(BOOL)loginWithUsername:(NSString*)username andPassword:(NSString*)password
+{
+    UIViewController *controllerToShowTo = [[AppDelegate appDel] getTabBarContoller];
+    [BWHelpers displayHud:@"Logging in..." onView:controllerToShowTo.view hidesAfter:3];
+    PFUser *user = [PFUser logInWithUsername:username password:password];
+    if (user) {
+        [[BWAppSettings sharedInstance] saveAppMode:BWBBMPMode];
+        [[AppDelegate appDel] switchToMainStoryBoard];
+    }
+    else{
+        [BWHelpers displayHud:@"Login failed..." onView:controllerToShowTo.view hidesAfter:3];
+        
+    }
+    return NO;
+}
+
+-(void)shakeAnimationForView:(UIView*)view
+{
+    CALayer *lbl = [view layer];
+    CGPoint posLbl = [lbl position];
+    CGPoint y = CGPointMake(posLbl.x-10, posLbl.y);
+    CGPoint x = CGPointMake(posLbl.x+10, posLbl.y);
+    CABasicAnimation * animation = [CABasicAnimation animationWithKeyPath:@"position"];
+    [animation setTimingFunction:[CAMediaTimingFunction
+                                  functionWithName:kCAMediaTimingFunctionEaseInEaseOut]];
+    [animation setFromValue:[NSValue valueWithCGPoint:x]];
+    [animation setToValue:[NSValue valueWithCGPoint:y]];
+    [animation setAutoreverses:YES];
+    [animation setDuration:0.08];
+    [animation setRepeatCount:3];
+    [lbl addAnimation:animation forKey:nil];
 }
 
 -(void)exportSelected{
